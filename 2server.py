@@ -18,15 +18,20 @@ class Server:
             threading.Thread(target=self.request_username, args=(client_socket,)).start()
 
     def request_username(self, client_socket):
-        client_socket.send("Enter your username: ".encode('utf-8'))
-        username = client_socket.recv(1024).decode('utf-8')
-        
-        self.clients[client_socket] = username
-        print(f"Username '{username}' added for client {client_socket.getpeername()}")
+        while True:
+            client_socket.send("Enter your username: ".encode('utf-8'))
+            username = client_socket.recv(1024).decode('utf-8').strip()
 
-        # Notify about the new client
-        self.broadcast_message(client_socket, f"{username} has joined the chat!")
-        self.send_online_clients()
+            # uniquness check
+            if username in self.clients.values():
+                client_socket.send("Username is already taken, please choose another one.\n".encode('utf-8'))
+            else:
+                self.clients[client_socket] = username
+                print(f"Username '{username}' added for client {client_socket.getpeername()}")
+                self.broadcast_message(client_socket, f"{username} has joined the chat!")
+                self.send_online_clients()
+                break
+
         threading.Thread(target=self.handle_client, args=(client_socket,)).start()
 
     def handle_client(self, client_socket):
@@ -42,14 +47,13 @@ class Server:
                 self.clients.pop(client_socket)
                 client_socket.close()
                 self.broadcast_message(None, f"{username} has left the chat.")
-                self.send_online_clients()
+                self.send_online_clients()  
                 break
 
     def broadcast_message(self, sender_socket, message):
         for client, username in self.clients.items():
             if client != sender_socket:
                 try:
-                    print(f"Sending message to {username}: {message}")
                     client.send(message.encode('utf-8'))
                 except Exception as e:
                     print(f"Error sending message to {username}: {e}")
@@ -60,7 +64,6 @@ class Server:
         online_clients = "Online clients: " + ", ".join(self.clients.values())
         self.broadcast_message(None, online_clients)
 
-# Start the server
 if __name__ == "__main__":
     server = Server()
     threading.Thread(target=server.start).start()

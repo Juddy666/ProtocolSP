@@ -24,7 +24,7 @@ class Server:
 
             # uniquness check
             if username in self.clients.values():
-                client_socket.send("Username is already taken, please choose another one.\n".encode('utf-8'))
+                client_socket.send("Please choose another one.\n".encode('utf-8'))
             else:
                 self.clients[client_socket] = username
                 print(f"Username '{username}' added for client {client_socket.getpeername()}")

@@ -1,18 +1,36 @@
 import socket
 import threading
 import json
-from encryption import generate_rsa_keys, rsa_encrypt, rsa_decrypt, rsa_sign, rsa_verify, aes_encrypt, aes_decrypt
-from message import create_chat_json, get_fingerprint
+import base64
+
 class ClientJSON:
-    def __init__(self, host='localhost', port=8089):  # Use your Wi-Fi IP and port 8088
+    def __init__(self, host='localhost', port=8089):  
         self.address = (host, port)
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect(self.address)
         print(f"Connected to server at {self.address}")
+        self.counter = 0  # Initialize a counter to prevent replay attacks
+
+    def sign_message(self, data):
+        # For now, simulate signing with a base64-encoded signature of the data + counter
+        combined = f"{data}{self.counter}"
+        signature = base64.b64encode(combined.encode()).decode()
+        return signature
 
     def send_message(self, message_dict):
-        # Convert the dictionary to a JSON string
-        json_message = json.dumps(message_dict)
+        # Increment the counter for replay attack prevention
+        self.counter += 1
+
+        # Create the signed message structure
+        signed_message = {
+            "type": "signed_data",
+            "data": message_dict,
+            "counter": self.counter,
+            "signature": self.sign_message(str(message_dict))
+        }
+
+        # Convert the dictionary to a JSON string and send it
+        json_message = json.dumps(signed_message)
         self.client_socket.send(json_message.encode('utf-8'))
         print(f"Sent JSON message: {json_message}")
 
@@ -24,17 +42,19 @@ class ClientJSON:
                 if message:
                     # Convert the received JSON string into a dictionary
                     json_data = json.loads(message)
-                    print(f"Received JSON message: {json_data}")
-                    Mtype = json_data.get('type')
-                    MSender = json_data.get('sender')
-                    MPlaintext = json_data.get('Plaintext')
+                    
+                    # Extract the type of the message and handle accordingly
+                    Mtype = json_data.get('data', {}).get('type')
+                    MSender = json_data.get('data', {}).get('sender')
+                    MPlaintext = json_data.get('data', {}).get('message')
+                    
                     if Mtype == "public_chat":
+                        # Original way of handling public messages
                         print(f"Public Chat from {MSender}: {MPlaintext}")
                     elif Mtype == "chat":
-                        print("chat is not yet implemented")
+                        print("Chat message received but not implemented")
                     else:
-                        print("Invalid chat type")
-                    
+                        print("Invalid or unknown message type")
                         
             except Exception as e:
                 print(f"Error receiving message: {e}")
@@ -42,14 +62,60 @@ class ClientJSON:
                 self.client_socket.close()
                 break
 
+    def send_hello_message(self):
+        message_dict = {
+            "type": "hello",
+            "public_key": "example_public_key"
+        }
+        self.send_message(message_dict)
+
+    def send_public_chat(self, message):
+        message_dict = {
+            "type": "public_chat",
+            "sender": "Jeff",
+            "message": message
+        }
+        self.send_message(message_dict)
+
+    def send_chat_message(self):
+        message_dict = {
+            "type": "chat",
+            "destination_servers": ["example_destination_server"],
+            "iv": "example_base64_iv",
+            "symm_keys": ["example_base64_aes_key"],
+            "chat": "example_base64_encrypted_message"
+        }
+        self.send_message(message_dict)
+
+    def send_client_list_request(self):
+        message_dict = {
+            "type": "client_list_request"
+        }
+        self.send_message(message_dict)
+
 # Start the client and allow interaction
 if __name__ == "__main__":
     client = ClientJSON()
     threading.Thread(target=client.receive_message).start()
-    
-    while True:
-        # Input message and wrap it into a dictionary
-        message = input("Enter message: ")                
-        message_dict = {"type": "public_chat","sender": "Jeff","Plaintext": message }
-        client.send_message(message_dict)
 
+    while True:
+        # Offer different types of messages to send
+        print("Choose an option:")
+        print("1. Send Hello message")
+        print("2. Send Public Chat message")
+        print("3. Send Encrypted Chat message")
+        print("4. Request Client List")
+        
+        option = input("Enter your choice: ")
+
+        if option == "1":
+            client.send_hello_message()
+        elif option == "2":
+            message = input("Enter the public chat message: ")
+            client.send_public_chat(message)
+        elif option == "3":
+            client.send_chat_message()
+        elif option == "4":
+            client.send_client_list_request()
+        else:
+            print("Invalid option, please try again.")

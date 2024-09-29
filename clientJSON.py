@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import hashes, serialization
 
 class ClientJSON:
-    def __init__(self, host='localhost', port=8089):  
+    def __init__(self, host='localhost', port=8089):
         self.address = (host, port)
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect(self.address)
@@ -41,36 +41,6 @@ class ClientJSON:
         signature = base64.b64encode(combined.encode()).decode()
         return signature
 
-    def generate_aes_key_iv(self):
-        key = os.urandom(32)  # 256-bit AES key
-        iv = os.urandom(16)   # 128-bit IV
-        return key, iv
-
-    def aes_encrypt(self, plaintext, key, iv):
-        backend = default_backend()
-        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=backend)
-        encryptor = cipher.encryptor()
-        # Pad the plaintext to ensure it's a multiple of the block size (16 bytes)
-        padded_plaintext = plaintext + " " * (16 - len(plaintext) % 16)
-        ciphertext = encryptor.update(padded_plaintext.encode()) + encryptor.finalize()
-        return ciphertext
-
-    def rsa_encrypt_aes_key(self, aes_key, recipient_public_key):
-        encrypted_key = recipient_public_key.encrypt(
-            aes_key,
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None
-            )
-        )
-        return encrypted_key
-
-    def load_public_key(self, pem_public_key):
-        # Load the public key from the provided PEM string
-        public_key = serialization.load_pem_public_key(pem_public_key, backend=default_backend())
-        return public_key
-
     def send_message(self, message_dict):
         # Increment the counter for replay attack prevention
         self.counter += 1
@@ -85,36 +55,51 @@ class ClientJSON:
 
         # Convert the dictionary to a JSON string and send it
         json_message = json.dumps(signed_message)
-        self.client_socket.send(json_message.encode('utf-8'))
+        self.client_socket.sendall(json_message.encode('utf-8'))
         print(f"Sent JSON message: {json_message}")
 
     def receive_message(self):
         while True:
             try:
                 # Receive and decode message
-                message = self.client_socket.recv(1024).decode('utf-8')
+                message = self.client_socket.recv(4096).decode('utf-8')
                 if message:
                     # Convert the received JSON string into a dictionary
                     json_data = json.loads(message)
                     
                     # Extract the type of the message and handle accordingly
-                    Mtype = json_data.get('data', {}).get('type')
-                    MSender = json_data.get('data', {}).get('sender')
-                    MPlaintext = json_data.get('data', {}).get('message')
-                    
-                    if Mtype == "public_chat":
-                        # Original way of handling public messages
-                        print(f"Public Chat from {MSender}: {MPlaintext}")
-                    elif Mtype == "chat":
-                        print("Chat message received but not implemented")
+                    response_type = json_data.get('type')
+                    if response_type == "client_list":
+                        self.handle_client_list_response(json_data)
                     else:
-                        print("Invalid or unknown message type")
-                        
+                        # Handle other message types (e.g., public_chat, chat)
+                        data_type = json_data.get('data', {}).get('type')
+                        if data_type == "public_chat":
+                            sender = json_data.get('data', {}).get('sender')
+                            plaintext = json_data.get('data', {}).get('message')
+                            print(f"Public Chat from {sender}: {plaintext}")
+                        elif data_type == "chat":
+                            print("Chat message received but not implemented")
+                        else:
+                            print("Invalid or unknown message type")
             except Exception as e:
                 print(f"Error receiving message: {e}")
                 print("Connection lost")
                 self.client_socket.close()
                 break
+
+    def handle_client_list_response(self, response):
+        # Extract client list from server response
+        servers = response.get("servers", [])
+        for server in servers:
+            address = server.get("address")
+            clients = server.get("clients", [])
+            print(f"Server Address: {address}")
+            for client in clients:
+                fingerprint = client.get("fingerprint")
+                public_key_pem = client.get("public_key")
+                print(f"Client Fingerprint: {fingerprint}")
+                print(f"Client Public Key: {public_key_pem}")
 
     def send_hello_message(self):
         # Send the public key in PEM format
@@ -166,7 +151,37 @@ class ClientJSON:
         
         # 6. Send the message
         self.send_message(message_dict)
-        
+
+    def generate_aes_key_iv(self):
+        key = os.urandom(32)  # 256-bit AES key
+        iv = os.urandom(16)   # 128-bit IV
+        return key, iv
+
+    def aes_encrypt(self, plaintext, key, iv):
+        backend = default_backend()
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=backend)
+        encryptor = cipher.encryptor()
+        # Pad the plaintext to ensure it's a multiple of the block size (16 bytes)
+        padded_plaintext = plaintext + " " * (16 - len(plaintext) % 16)
+        ciphertext = encryptor.update(padded_plaintext.encode()) + encryptor.finalize()
+        return ciphertext
+
+    def rsa_encrypt_aes_key(self, aes_key, recipient_public_key):
+        encrypted_key = recipient_public_key.encrypt(
+            aes_key,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        return encrypted_key
+
+    def load_public_key(self, pem_public_key):
+        # Load the public key from the provided PEM string
+        public_key = serialization.load_pem_public_key(pem_public_key, backend=default_backend())
+        return public_key
+
     def send_client_list_request(self):
         message_dict = {
             "type": "client_list_request"
@@ -175,7 +190,6 @@ class ClientJSON:
 
 # Start the client and allow interaction
 if __name__ == "__main__":
-
     client = ClientJSON()
     threading.Thread(target=client.receive_message).start()
 

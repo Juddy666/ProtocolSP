@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import hashes, serialization
 
 class ClientJSON:
-    def __init__(self, host='localhost', port=8089):
+    def __init__(self, host='localhost', port=8088):
         self.address = (host, port)
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect(self.address)
@@ -125,31 +125,42 @@ class ClientJSON:
         # Load the public key for encryption
         public_key = self.load_public_key(pem_public_key)
         
-        # 1. Generate AES key and IV
+        # 1. Gather user inputs
+        message = input("Enter the chat message to encrypt: ")
+        sender_fingerprint = input("Enter the sender's fingerprint: ")
+        receiver_fingerprint = input("Enter the receiver's fingerprint: ")
+
+        # 2. Generate AES key and IV
         aes_key, iv = self.generate_aes_key_iv()
         
-        # 2. Encrypt the chat message using AES
-        message = input("Enter the chat message to encrypt: ")
+        # 3. Encrypt the chat message using AES
         encrypted_message = self.aes_encrypt(message, aes_key, iv)
         
-        # 3. Encrypt the AES key with the RSA public key
+        # 4. Encrypt the AES key with the RSA public key of the recipient
         encrypted_aes_key = self.rsa_encrypt_aes_key(aes_key, public_key)
         
-        # 4. Encode IV, AES key, and encrypted chat message in base64
+        # 5. Encode IV, AES key, and encrypted chat message in base64
         encoded_iv = base64.b64encode(iv).decode()
         encoded_aes_key = base64.b64encode(encrypted_aes_key).decode()
         encoded_encrypted_message = base64.b64encode(encrypted_message).decode()
         
-        # 5. Prepare the JSON message structure
+        # 6. Prepare the JSON message structure
         message_dict = {
             "type": "chat",
             "destination_servers": ["example_destination_server"],  # Placeholder for actual server addresses
             "iv": encoded_iv,
             "symm_keys": [encoded_aes_key],  # Only one recipient in this example
-            "chat": encoded_encrypted_message
+            "chat": encoded_encrypted_message,
+            "chat_info": {
+                "participants": [
+                    sender_fingerprint,
+                    receiver_fingerprint
+                ],
+                "message": message
+            }
         }
         
-        # 6. Send the message
+        # 7. Send the message
         self.send_message(message_dict)
 
     def generate_aes_key_iv(self):

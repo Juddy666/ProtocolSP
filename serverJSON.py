@@ -4,7 +4,7 @@ import json
 import hashlib
 
 class ServerJSON:
-    def __init__(self, host='localhost', port=8089):
+    def __init__(self, host='localhost', port=8088):
         self.address = (host, port)
         self.clients = {}  # Store clients as {fingerprint: (client_socket, public_key)}
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

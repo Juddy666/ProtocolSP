@@ -323,7 +323,7 @@ class ClientJSON:
 if __name__ == "__main__":
     client = ClientJSON()  # Automatically sends hello message and requests client list
     threading.Thread(target=client.receive_message, daemon=True).start()
-
+    time.sleep(0.25) #delay ensures correct order of client prompts
     while True:
         # Offer different types of messages to send
         print("\nChoose an option:")
@@ -341,6 +341,7 @@ if __name__ == "__main__":
             client.send_chat_message()
         elif option == "3":
             client.send_client_list_request()
+            time.sleep(0.25) #delay ensures correct ordering of client prompts
         elif option == "4":
             print("Exiting client.")
             client.client_socket.close()

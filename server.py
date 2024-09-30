@@ -33,7 +33,10 @@ class ServerJSON:
             try:
                 # Receive data from the client
                 data = client_socket.recv(4096).decode('utf-8')
+                #handlde client disconnects
                 if not data:
+                    print(f"Client {client_socket.getpeername()} disconnected")
+                    self.remove_client(client_socket)
                     break
                 data_buffer += data
                 # Attempt to parse JSON messages
@@ -45,6 +48,12 @@ class ServerJSON:
                     except json.JSONDecodeError:
                         # Not enough data to decode; break and wait for more
                         break
+            #handle unexpected client disconnects
+            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError) as e:
+                print(f"Client {client_socket.getpeername()} disconnected unexpectedly: {e}")
+                self.remove_client(client_socket)
+                break
+
             except Exception as e:
                 print(f"Client disconnected or error occurred: {e}")
                 self.remove_client(client_socket)

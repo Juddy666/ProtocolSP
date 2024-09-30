@@ -17,6 +17,9 @@ class ClientJSON:
         self.counter = 0  # Initialize a counter to prevent replay attacks
         self.private_key, self.public_key = self.generate_rsa_key_pair()  # Generate RSA keys
 
+        # Automatically send hello message upon connection
+        self.send_hello_message()
+
     def generate_rsa_key_pair(self):
         # Generate RSA private and public keys
         private_key = rsa.generate_private_key(
@@ -97,9 +100,7 @@ class ClientJSON:
             print(f"Server Address: {address}")
             for client in clients:
                 fingerprint = client.get("fingerprint")
-                public_key_pem = client.get("public_key")
                 print(f"Client Fingerprint: {fingerprint}")
-                print(f"Client Public Key: {public_key_pem}")
 
     def send_hello_message(self):
         # Send the public key in PEM format
@@ -201,27 +202,24 @@ class ClientJSON:
 
 # Start the client and allow interaction
 if __name__ == "__main__":
-    client = ClientJSON()
+    client = ClientJSON()  # Automatically sends hello message
     threading.Thread(target=client.receive_message).start()
 
     while True:
         # Offer different types of messages to send
         print("Choose an option:")
-        print("1. Send Hello message")
-        print("2. Send Public Chat message")
-        print("3. Send Encrypted Chat message")
-        print("4. Request Client List")
+        print("1. Send Public Chat message")
+        print("2. Send Encrypted Chat message")
+        print("3. Request Client List")
         
         option = input("Enter your choice: ")
 
         if option == "1":
-            client.send_hello_message()
-        elif option == "2":
             message = input("Enter the public chat message: ")
             client.send_public_chat(message)
-        elif option == "3":
+        elif option == "2":
             client.send_chat_message()
-        elif option == "4":
+        elif option == "3":
             client.send_client_list_request()
         else:
             print("Invalid option, please try again.")

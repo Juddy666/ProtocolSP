@@ -47,8 +47,10 @@ class ServerJSON:
                         self.handle_hello_message(client_socket, json_data['data'])
                     elif message_type == 'client_list_request':
                         self.send_client_list(client_socket)
+                    elif message_type == 'chat':
+                        self.send_private_message(client_socket, json_data)
                     else:
-                        # Handle other types of messages (e.g., broadcast or chat)
+                        # Handle other types of messages (e.g., broadcast or public chat)
                         self.broadcast_message(client_socket, json_data)
                 except json.JSONDecodeError:
                     # Continue receiving if the message is incomplete
@@ -79,13 +81,28 @@ class ServerJSON:
             "servers": [
                 {
                     "address": f"{self.address[0]}:{self.address[1]}",
-                    "clients": [{"fingerprint": fingerprint, "public_key": public_key.decode()}
+                    "clients": [{"fingerprint": fingerprint}
                                 for fingerprint, (sock, public_key) in self.clients.items()]
                 }
             ]
         }
         # Send the client list to the requesting client
         client_socket.send(json.dumps(client_list).encode('utf-8'))
+
+    def send_private_message(self, sender_socket, message_dict):
+        # Convert the dictionary into a JSON string
+        json_message = json.dumps(message_dict)
+        
+        # Broadcast the private message to all clients except the sender
+        for fingerprint, (client_socket, public_key) in self.clients.items():
+            if client_socket != sender_socket:
+                try:
+                    # Send the JSON string to the client
+                    client_socket.send(json_message.encode('utf-8'))
+                    print(f"Sent private message to client with fingerprint: {fingerprint}")
+                except Exception as e:
+                    print(f"Error sending private message: {e}")
+                    self.remove_client(client_socket)
 
     def broadcast_message(self, sender_socket, message_dict):
         # Convert the dictionary into a JSON string
@@ -110,4 +127,3 @@ class ServerJSON:
 if __name__ == "__main__":
     server = ServerJSON()
     threading.Thread(target=server.start).start()
-

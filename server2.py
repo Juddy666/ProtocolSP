@@ -3,18 +3,26 @@ import threading
 import json
 import base64
 import hashlib
+import os
+import argparse
+import http.server
+import socketserver
+from urllib.parse import urlparse, parse_qs
+from http import HTTPStatus
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import padding
 
 class ServerJSON:
-    def __init__(self, host='localhost', port=8088, server_port=8090, neighbour_addresses=None):
+    def __init__(self, host='localhost', port=8088, server_port=8090, http_port=8000, neighbour_addresses=None):
         self.address = (host, port)
         self.server_address = (host, server_port)
+        self.http_address = (host, http_port)
         self.clients = {}  # Clients connected to this server
         self.client_list = {}  # All clients in the neighbourhood
         self.servers = {}  # Connected servers
         self.neighbour_addresses = neighbour_addresses or []  # Addresses of neighbouring servers
+        self.file_storage = {}  # Store files as {file_id: file_path}
 
         # Socket for client connections
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -43,6 +51,10 @@ class ServerJSON:
         threading.Thread(target=self.accept_client_connections, daemon=True).start()
         # Start accepting server connections
         threading.Thread(target=self.accept_server_connections, daemon=True).start()
+        # Start the HTTP server for file uploads/downloads
+        threading.Thread(target=self.start_http_server, daemon=True).start()
+        # Start heartbeat checking
+        threading.Thread(target=self.heartbeat_check, daemon=True).start()
         # Connect to neighbour servers
         for neighbour in self.neighbour_addresses:
             threading.Thread(target=self.connect_to_server, args=(neighbour,), daemon=True).start()
@@ -67,7 +79,7 @@ class ServerJSON:
             server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server_socket.connect(server_address)
             print(f"Connected to server {server_address}")
-            self.servers[server_address] = {'socket': server_socket}
+            self.servers[server_address] = {'socket': server_socket, 'last_heartbeat': threading.Event()}
             threading.Thread(target=self.handle_server_connection, args=(server_socket, server_address), daemon=True).start()
             # Send server_hello
             self.send_server_hello(server_socket)
@@ -76,7 +88,7 @@ class ServerJSON:
 
     def handle_server_connection(self, server_socket, server_address):
         data_buffer = ""
-        self.servers[server_address] = {'socket': server_socket}
+        self.servers[server_address] = {'socket': server_socket, 'last_heartbeat': threading.Event()}
         while True:
             try:
                 data = server_socket.recv(4096).decode('utf-8')
@@ -115,6 +127,8 @@ class ServerJSON:
             self.handle_client_update(server_socket, server_address, message)
         elif message_type == 'client_update_request':
             self.handle_client_update_request(server_socket)
+        elif message_type == 'heartbeat':
+            self.handle_heartbeat(server_address)
         elif message_type == 'signed_data':
             self.process_message(server_socket, message, from_server=True)
         else:
@@ -159,6 +173,27 @@ class ServerJSON:
         fingerprints_to_remove = [f for f, info in self.client_list.items() if info['server_address'] == f"{server_address[0]}:{server_address[1]}"]
         for fprint in fingerprints_to_remove:
             del self.client_list[fprint]
+
+    def heartbeat_check(self):
+        while True:
+            for server_address, server_info in list(self.servers.items()):
+                try:
+                    heartbeat_message = {"type": "heartbeat"}
+                    server_info['socket'].sendall(json.dumps(heartbeat_message).encode('utf-8'))
+                    # Set a timer to wait for a heartbeat response
+                    server_info['last_heartbeat'].clear()
+                    if not server_info['last_heartbeat'].wait(timeout=10):
+                        print(f"No heartbeat from server {server_address}, removing.")
+                        self.remove_server(server_address)
+                except Exception as e:
+                    print(f"Error sending heartbeat to server {server_address}: {e}")
+                    self.remove_server(server_address)
+            threading.Event().wait(timeout=30)  # Wait before next heartbeat
+
+    def handle_heartbeat(self, server_address):
+        # Acknowledge the heartbeat
+        if server_address in self.servers:
+            self.servers[server_address]['last_heartbeat'].set()
 
     def handle_client(self, client_socket):
         data_buffer = ""
@@ -210,6 +245,9 @@ class ServerJSON:
                 self.send_client_list(sender_socket)
             else:
                 print("Received client_list_request from server, ignoring.")
+        elif message_type == 'heartbeat':
+            if from_server:
+                self.handle_heartbeat(sender_socket.getpeername())
         else:
             print(f"Unknown message type received: {message_type}")
 
@@ -416,8 +454,61 @@ class ServerJSON:
             # Send client_update to other servers
             self.broadcast_client_update()
 
-    # You can implement file upload/download and heartbeat methods here if needed
-import argparse
+    # HTTP server for file handling
+    def start_http_server(self):
+        handler = self.create_http_handler()
+        httpd = socketserver.TCPServer((self.http_address[0], self.http_address[1]), handler)
+        print(f"HTTP server started at {self.http_address}")
+        httpd.serve_forever()
+
+    def create_http_handler(self):
+        server_instance = self
+
+        class CustomHandler(http.server.SimpleHTTPRequestHandler):
+            def do_POST(self):
+                if self.path == '/api/upload':
+                    content_length = int(self.headers['Content-Length'])
+                    if content_length > 10 * 1024 * 1024:  # 10 MB size limit
+                        self.send_response(HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+                        self.end_headers()
+                        return
+                    # Read the file data
+                    file_data = self.rfile.read(content_length)
+                    # Generate a unique file ID
+                    file_id = base64.urlsafe_b64encode(os.urandom(16)).decode()
+                    file_path = os.path.join('uploads', file_id)
+                    os.makedirs('uploads', exist_ok=True)
+                    # Save the file
+                    with open(file_path, 'wb') as f:
+                        f.write(file_data)
+                    # Store the file info
+                    server_instance.file_storage[file_id] = file_path
+                    # Respond with the file URL
+                    self.send_response(HTTPStatus.OK)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    response = json.dumps({'file_url': f'http://{self.server.server_address[0]}:{self.server.server_address[1]}/{file_id}'})
+                    self.wfile.write(response.encode())
+                else:
+                    self.send_response(HTTPStatus.NOT_FOUND)
+                    self.end_headers()
+
+            def do_GET(self):
+                parsed_path = urlparse(self.path)
+                file_id = parsed_path.path.lstrip('/')
+                if file_id in server_instance.file_storage:
+                    file_path = server_instance.file_storage[file_id]
+                    if os.path.exists(file_path):
+                        self.send_response(HTTPStatus.OK)
+                        self.send_header('Content-Type', 'application/octet-stream')
+                        self.end_headers()
+                        with open(file_path, 'rb') as f:
+                            self.wfile.write(f.read())
+                        return
+                self.send_response(HTTPStatus.NOT_FOUND)
+                self.end_headers()
+
+        return CustomHandler
 
 # Start the server
 if __name__ == "__main__":
@@ -425,13 +516,12 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="localhost", help="Server host address.")
     parser.add_argument("--port", type=int, default=8088, help="Port for client connections.")
     parser.add_argument("--server_port", type=int, default=8090, help="Port for server-to-server connections.")
+    parser.add_argument("--http_port", type=int, default=8000, help="Port for HTTP file uploads/downloads.")
     parser.add_argument("--neighbours", nargs="*", default=[], help="List of neighbour server addresses (e.g., localhost:8091).")
 
     args = parser.parse_args()
 
-    server = ServerJSON(host=args.host, port=args.port, server_port=args.server_port, neighbour_addresses=args.neighbours)
-
+    server = ServerJSON(host=args.host, port=args.port, server_port=args.server_port, http_port=args.http_port, neighbour_addresses=args.neighbours)
     # Keep the main thread alive to prevent the program from exiting
     while True:
         pass
-

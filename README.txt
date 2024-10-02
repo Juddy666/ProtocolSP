@@ -74,3 +74,6 @@ When a client wants to send a private message, the server will look at the ‘de
 
 Sending a public chat:
 In addition to private messages, users can also send public messages. Public messages are broadcasted by the server to all clients connected to it. If the server is part of a neighbourhood, it will forward the public message to other servers, allowing all users in the neighbourhood to see the message
+
+Point-to-point file transfer:
+File transfers are performed over an HTTP[S] API. Users can upload a file via it's file path and the server will respond with the file data as a URL. This URL can be sent to other user's by copying and pasting it into a public or encrypted chat message. Receiving users can then download the file by copying and pasting the received URL into the "Download file" option. File uploads and downloads are not authenticated and rely on keeping the URL a secret.

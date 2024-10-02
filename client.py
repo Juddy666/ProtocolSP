@@ -1,31 +1,27 @@
-#Client implementation of chat program for Secure Programming Project
-#Authors:
-#Daniel Mosler - a1687565
-#Jeffrey Judd - a1833565
-#Maeve
-#Em
-
 import socket
 import threading
 import json
 import base64
 import os
 import time
+import argparse
+import requests
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.backends import default_backend
 
 class ClientJSON:
-    def __init__(self, host='localhost', port=8088):
+    def __init__(self, host='localhost', port=8088, http_port=8000):
         self.address = (host, port)
+        self.http_address = f"http://{host}:{http_port}"
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect(self.address)
         print(f"Connected to server at {self.address}")
         self.counter = 0  # Initialize a counter to prevent replay attacks
         self.private_key, self.public_key = self.generate_rsa_key_pair()  # Generate RSA keys
         self.fingerprint = self.generate_fingerprint(self.public_key)  # Generate fingerprint
-        self.known_clients = {}  # Dictionary to store known clients' public keys
+        self.known_clients = {}  # Dictionary to store known clients' public keys and server addresses
 
         # Automatically send hello message upon connection
         self.send_hello_message()
@@ -146,8 +142,11 @@ class ClientJSON:
                 client_public_key = serialization.load_pem_public_key(client_public_key_pem, backend=default_backend())
                 fingerprint = self.generate_fingerprint(client_public_key)
                 print(f"Client Fingerprint: {fingerprint}")
-                # Store the public key in known_clients
-                self.known_clients[fingerprint] = client_public_key
+                # Store the public key and server address in known_clients
+                self.known_clients[fingerprint] = {
+                    'public_key': client_public_key,
+                    'server_address': address
+                }
             print("--- End of Client List ---\n")
 
     def handle_public_chat(self, json_data):
@@ -205,15 +204,16 @@ class ClientJSON:
         if not participants:
             return False
         sender_fingerprint = participants[0]
-        sender_public_key = self.get_public_key_by_fingerprint(sender_fingerprint)
-        if not sender_public_key:
+        sender_info = self.get_client_info_by_fingerprint(sender_fingerprint)
+        if not sender_info:
             print("Sender's public key not found. Requesting client list...")
             self.send_client_list_request()
             time.sleep(1)  # Wait for 1 second to allow the client list to update
-            sender_public_key = self.get_public_key_by_fingerprint(sender_fingerprint)
-            if not sender_public_key:
+            sender_info = self.get_client_info_by_fingerprint(sender_fingerprint)
+            if not sender_info:
                 print("Failed to retrieve sender's public key after updating client list.")
                 return False
+        sender_public_key = sender_info['public_key']
 
         try:
             sender_public_key.verify(
@@ -230,7 +230,7 @@ class ClientJSON:
             print(f"Signature verification failed: {e}")
             return False
 
-    def get_public_key_by_fingerprint(self, fingerprint):
+    def get_client_info_by_fingerprint(self, fingerprint):
         return self.known_clients.get(fingerprint)
 
     def send_hello_message(self):
@@ -253,10 +253,12 @@ class ClientJSON:
     def send_chat_message(self):
         # Get recipient's fingerprint and public key
         receiver_fingerprint = input("Enter the receiver's fingerprint: ")
-        receiver_public_key = self.get_public_key_by_fingerprint(receiver_fingerprint)
-        if not receiver_public_key:
+        recipient_info = self.get_client_info_by_fingerprint(receiver_fingerprint)
+        if not recipient_info:
             print("Receiver's public key not found.")
             return
+        receiver_public_key = recipient_info['public_key']
+        recipient_server_address = recipient_info['server_address']
 
         message = input("Enter the chat message: ")
 
@@ -284,7 +286,7 @@ class ClientJSON:
 
         message_dict = {
             "type": "chat",
-            "destination_servers": [self.address[0]],  # For simplicity
+            "destination_servers": [recipient_server_address],
             "iv": encoded_iv,
             "symm_keys": [encoded_encrypted_aes_key],
             "chat": encoded_ciphertext,
@@ -323,21 +325,59 @@ class ClientJSON:
         self.client_socket.sendall(json.dumps(message_dict).encode('utf-8'))
 
     def send_file_upload_request(self):
-        # Placeholder for file upload functionality
-        print("File upload functionality not implemented.")
+        file_path = input("Enter the file path to upload: ")
+        if not os.path.isfile(file_path):
+            print("File not found.")
+            return
+        try:
+            with open(file_path, 'rb') as f:
+                files = {'file': f}
+                response = requests.post(f"{self.http_address}/api/upload", files={'file': f})
+                if response.status_code == 200:
+                    file_url = response.json().get('file_url')
+                    print(f"File uploaded successfully. File URL: {file_url}")
+                else:
+                    print(f"File upload failed. Status code: {response.status_code}")
+        except Exception as e:
+            print(f"Error uploading file: {e}")
 
-# Start the client and allow interaction
+    def download_file(self):
+        file_url = input("Enter the file URL to download: ")
+        try:
+            response = requests.get(file_url)
+            if response.status_code == 200:
+                file_data = response.content
+                file_name = input("Enter the name to save the file as: ")
+                with open(file_name, 'wb') as f:
+                    f.write(file_data)
+                print(f"File downloaded and saved as {file_name}")
+            else:
+                print(f"File download failed. Status code: {response.status_code}")
+        except Exception as e:
+            print(f"Error downloading file: {e}")
+
+    # Start the client and allow interaction
 if __name__ == "__main__":
-    client = ClientJSON()  # Automatically sends hello message and requests client list
+    parser = argparse.ArgumentParser(description="Start the client.")
+    parser.add_argument("--host", default="localhost", help="Server host address.")
+    parser.add_argument("--port", type=int, default=8088, help="Server port.")
+    parser.add_argument("--http_port", type=int, default=8000, help="HTTP server port.")
+
+    args = parser.parse_args()
+
+    client = ClientJSON(host=args.host, port=args.port, http_port=args.http_port)
     threading.Thread(target=client.receive_message, daemon=True).start()
-    time.sleep(0.25) #delay ensures correct order of client prompts
+    time.sleep(0.25)  # Delay ensures correct order of client prompts
+
     while True:
         # Offer different types of messages to send
         print("\nChoose an option:")
         print("1. Send Public Chat message")
         print("2. Send Encrypted Chat message")
         print("3. Request Client List")
-        print("4. Exit")
+        print("4. Upload File")
+        print("5. Download File")
+        print("6. Exit")
 
         option = input("Enter your choice: ")
 
@@ -348,8 +388,12 @@ if __name__ == "__main__":
             client.send_chat_message()
         elif option == "3":
             client.send_client_list_request()
-            time.sleep(0.25) #delay ensures correct ordering of client prompts
+            time.sleep(0.25)  # Delay ensures correct ordering of client prompts
         elif option == "4":
+            client.send_file_upload_request()
+        elif option == "5":
+            client.download_file()
+        elif option == "6":
             print("Exiting client.")
             client.client_socket.close()
             break

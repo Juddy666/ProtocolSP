@@ -20,16 +20,21 @@ Dependencies:
         If you have not used python before, you will need to install a python interpreter from www.python.org/downloads, 
         alternativelyrunning the command "python" in VScode will prompt a download from the microsoft store.
 
-        Windows users will need to install the cryptography library if they have not done so previously via the command:
+        Windows users will need to install the cryptography and requests library if they have not done so previously via the command:
             pip install cryptography
+            pip install request
+
 
     For Mac Users:
         If you have not used python before, you will need to install a python interpreter for your system using the command:
             brew install python3
 
-        Mac users will need to install the cryptography library using the command:
-            pip install cryptography, OR
-            brew install cryptography, depending on your environment
+        Mac users will need to install the cryptography and requests library using the command:
+            python3 -m pip install cryptography, OR
+            brew install cryptography, depending on your environment and
+            python3 -m pip install requests, OR
+            brew install requests
+
         
 
 

@@ -5,7 +5,8 @@ This is a README file for the Secure Programming project of:
     - Em
 
 Dependencies:
-    This project is being developed in Python using Microsoft Visual Studio Code as an IDE, as such using this environment is recommended. 
+    This project is being developed in Python using Microsoft Visual Studio Code as an IDE, as such using this environment is 
+    recommended. 
     VSC can be downloaded for Windows or Mac at:
         https://code.visualstudio.com/
 
@@ -16,8 +17,8 @@ Dependencies:
         - Pip Manager (used to manage pip libraries)                                        *May or may not be required
 
     For Windows Users:
-        If you have not used python before, you will need to install a python interpreter from www.python.org/downloads, alternatively
-        running the command "python" in VScode will prompt a download from the microsoft store.
+        If you have not used python before, you will need to install a python interpreter from www.python.org/downloads, 
+        alternativelyrunning the command "python" in VScode will prompt a download from the microsoft store.
 
         Windows users will need to install the cryptography library if they have not done so previously via the command:
             pip install cryptography

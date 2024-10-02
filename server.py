@@ -1,3 +1,10 @@
+#Server implementation of chat program for Secure Programming Project
+#Authors:
+#Daniel Mosler - a1687565
+#Jeffrey Judd - a1833565
+#Maeve
+#Em
+
 import socket
 import threading
 import json

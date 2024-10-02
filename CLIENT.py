@@ -4,14 +4,17 @@ import json
 import base64
 import os
 import time
+import argparse
+import requests
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.backends import default_backend
 
 class ClientJSON:
-    def __init__(self, host='localhost', port=8088):
+    def __init__(self, host='localhost', port=8088, http_port=8000):
         self.address = (host, port)
+        self.http_address = f"http://{host}:{http_port}"
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect(self.address)
         print(f"Connected to server at {self.address}")
@@ -269,7 +272,7 @@ class ClientJSON:
         encrypted_aes_key = receiver_public_key.encrypt(
             aes_key,
             padding.OAEP(
-                mgf=padding.MGF1(hashes.SHA256()),
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
                 label=None
             )
@@ -322,19 +325,47 @@ class ClientJSON:
         self.client_socket.sendall(json.dumps(message_dict).encode('utf-8'))
 
     def send_file_upload_request(self):
-        # Placeholder for file upload functionality
-        print("File upload functionality not implemented.")
-import argparse
+        file_path = input("Enter the file path to upload: ")
+        if not os.path.isfile(file_path):
+            print("File not found.")
+            return
+        try:
+            with open(file_path, 'rb') as f:
+                files = {'file': f}
+                response = requests.post(f"{self.http_address}/api/upload", files={'file': f})
+                if response.status_code == 200:
+                    file_url = response.json().get('file_url')
+                    print(f"File uploaded successfully. File URL: {file_url}")
+                else:
+                    print(f"File upload failed. Status code: {response.status_code}")
+        except Exception as e:
+            print(f"Error uploading file: {e}")
 
-# Start the client and allow interaction
+    def download_file(self):
+        file_url = input("Enter the file URL to download: ")
+        try:
+            response = requests.get(file_url)
+            if response.status_code == 200:
+                file_data = response.content
+                file_name = input("Enter the name to save the file as: ")
+                with open(file_name, 'wb') as f:
+                    f.write(file_data)
+                print(f"File downloaded and saved as {file_name}")
+            else:
+                print(f"File download failed. Status code: {response.status_code}")
+        except Exception as e:
+            print(f"Error downloading file: {e}")
+
+    # Start the client and allow interaction
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Start the client.")
     parser.add_argument("--host", default="localhost", help="Server host address.")
     parser.add_argument("--port", type=int, default=8088, help="Server port.")
+    parser.add_argument("--http_port", type=int, default=8000, help="HTTP server port.")
 
     args = parser.parse_args()
 
-    client = ClientJSON(host=args.host, port=args.port)
+    client = ClientJSON(host=args.host, port=args.port, http_port=args.http_port)
     threading.Thread(target=client.receive_message, daemon=True).start()
     time.sleep(0.25)  # Delay ensures correct order of client prompts
 
@@ -344,7 +375,9 @@ if __name__ == "__main__":
         print("1. Send Public Chat message")
         print("2. Send Encrypted Chat message")
         print("3. Request Client List")
-        print("4. Exit")
+        print("4. Upload File")
+        print("5. Download File")
+        print("6. Exit")
 
         option = input("Enter your choice: ")
 
@@ -357,6 +390,10 @@ if __name__ == "__main__":
             client.send_client_list_request()
             time.sleep(0.25)  # Delay ensures correct ordering of client prompts
         elif option == "4":
+            client.send_file_upload_request()
+        elif option == "5":
+            client.download_file()
+        elif option == "6":
             print("Exiting client.")
             client.client_socket.close()
             break

@@ -36,12 +36,14 @@ Dependencies:
             brew install requests
 
         
+Vulnerabilites:
+    ATTENTION!! This code purposley contains backdoors to assess the awareness of students. It is highly vulenrable and can be subject to malicious use. Please use at your risk.
+        
 
-
+Use guide:
 servers need to be connected to their neighbouring servers for proper connection
 TEST CASES 
-##for local machines
-#type in your terminal
+#for local machines type in your terminal
 # start server 1 
 python server.py --host localhost --port 8088 --server_port 8090 --neighbours localhost:8091
 # start server2
@@ -49,15 +51,14 @@ python server.py --host localhost --port 8089 --server_port 8091 --neighbours lo
 
 # add client 1 on server 1
 python client.py --host localhost --port 8088
-
 # add client 2 on server 2
 python client.py --host localhost --port 8089
 
-
-## running server on different machines
+# running server on different machines
 add the ip of your host if of your machine
 python server.py --host 192.168.1.2 --port 8088 --server_port 9000 --neighbours 192.168.1.3:9001
 python server.py --host 192.168.1.3 --port 8089 --server_port 9001 --neighbours 192.168.1.2:9000
+
 
 Overview
 The Encrypted Chat System is a Python program that lets users communicate over a network. It uses RSA encryption to share keys and AES to encrypt messages, ensuring security for private chats. The server manages connections between clients and but also links up with other servers to form a neighbourhood. This allows clients to send messages to other client on different servers and decentralises the protocol, making more secure. 
@@ -77,4 +78,4 @@ Sending a public chat:
 In addition to private messages, users can also send public messages. Public messages are broadcasted by the server to all clients connected to it. If the server is part of a neighbourhood, it will forward the public message to other servers, allowing all users in the neighbourhood to see the message
 
 Point-to-point file transfer:
-File transfers are performed over an HTTP[S] API. Users can upload a file via it's file path and the server will respond with the file data as a URL. This URL can be sent to other user's by copying and pasting it into a public or encrypted chat message. Receiving users can then download the file by copying and pasting the received URL into the "Download file" option. File uploads and downloads are not authenticated and rely on keeping the URL a secret.
+File transfers are performed over an HTTP[S] API. Users can upload a file via it's file path and the server will respond with the file data as a URL. This URL can be sent to other user's by copying and pasting it into a public or encrypted chat message. Receiving users can then download the file by copying and pasting the received URL into the "Download file" option. File uploads and downloads are not authenticated and rely on keeping the URL a secret. User can share the address of the uploaded file privately to another user who can use this url to download the file.

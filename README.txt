@@ -1,3 +1,36 @@
+This is a README file for the Secure Programming project of:
+    - Daniel Mosler / a1687565
+    - Jeff 
+    - Maeve 
+    - Em
+
+Dependencies:
+    This project is being developed in Python using Microsoft Visual Studio Code as an IDE, as such using this environment is recommended. 
+    VSC can be downloaded for Windows or Mac at:
+        https://code.visualstudio.com/
+
+    VScode uses extensions to enable the use of different programming languages. Reccomended extensions include:
+        - Python (Provides support for the python language)                                 *Required
+        - Python Debugger (Provides an improved debugging experience for python programs)   *Reccomended
+        - Pip Manager (used to manage pip libraries)                                        *May or may not be required
+
+    For Windows Users:
+        If you have not used python before, you will need to install a python interpreter from www.python.org/downloads, alternatively
+        running the command "python" in VScode will prompt a download from the microsoft store.
+
+        Windows users will need to install the cryptography library if they have not done so previously via the command:
+            pip install cryptography
+
+    For Mac Users:
+        If you have not used python before, you will need to install a python interpreter for your system using the command:
+            brew install python3
+
+        Mac users will need to install the cryptography library using the command:
+            pip install cryptography, OR
+            brew install cryptography, depending on your environment
+        
+
+
 servers need to be connected to their neighbouring servers for proper connection
 TEST CASES 
 ##for local machines

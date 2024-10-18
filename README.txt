@@ -41,7 +41,7 @@ Vulnerabilites:
         
 
 Use guide:
-servers need to be connected to their neighbouring servers for proper connection
+servers need to be connected to their neighbouring servers for proper connection (vulnerableServer.py includes backdoors and can be used instead of server.py).
 TEST CASES 
 #for local machines type in your terminal
 # start server 1 

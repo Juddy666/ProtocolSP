@@ -1,4 +1,4 @@
-This is a README file for the Secure Programming project of:
+This is a README file for the Secure Programming project of Group 31:
     - Daniel Mosler / a1687565
     - Jeffrey Judd / a1833565
     - Maeve Elshaug-Betson a1824050

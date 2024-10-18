@@ -1,3 +1,9 @@
+# Group 31
+# Daniel Mosler / a1687565
+# Jeffrey Judd / a1833565
+# Maeve Elshaug-Betson a1824050
+# Mehdi Mahzounieh / a1870199
+
 import socket
 import threading
 import json

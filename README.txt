@@ -37,11 +37,11 @@ Dependencies:
 
         
 Vulnerabilites:
-    ATTENTION!! This code purposley contains backdoors to assess the awareness of students. It is highly vulenrable and can be subject to malicious use. Please use at your risk.
+    ATTENTION!! The vulnerable code purposley contains backdoors to assess the awareness of students. It is highly vulenrable and can be subject to malicious use. Please use at your risk.
         
 
 Use guide:
-servers need to be connected to their neighbouring servers for proper connection (vulnerableServer.py includes backdoors and can be used instead of server.py).
+servers need to be connected to their neighbouring servers for proper connection (vulnerableServer.py includes intentional backdoors and can be used instead of server.py).
 TEST CASES 
 #for local machines type in your terminal
 # start server 1 
